@@ -1,9 +1,11 @@
 import csv
 import bisect
+import numpy as np
 
 
 RANGE_START = 'start'
 RANGE_END = 'end'
+RANGE_LEN = 'length'
 RANGE_SCORE = 'score'
 
 
@@ -14,9 +16,11 @@ def read_range(fd, start, length):
 
 
 class GenomeTagRange(object):
-    def __init__(self, tag_file_path):
+    def __init__(self, tag_file_path, chromosome_size_file_path):
         self.tag_file_path = tag_file_path
+        self.chromosome_size_file_path = chromosome_size_file_path
         self.data_dict = None
+        self.sizes_dict = None
         self._init_data()
 
     def _init_data(self):
@@ -30,6 +34,15 @@ class GenomeTagRange(object):
                 self.data_dict[row[0]][RANGE_START].append(int(row[1]))
                 self.data_dict[row[0]][RANGE_END].append(int(row[2]))
                 self.data_dict[row[0]][RANGE_SCORE].append(int(row[3]))
+        self.sizes_dict = self._init_sizes(self.chromosome_size_file_path)
+
+    def _init_sizes(self, file_path):
+        sizes_dict = {}
+        with open(file_path) as tsv_file:
+            tsv_reader = csv.reader(tsv_file, delimiter='\t')
+            for row in tsv_reader:
+                sizes_dict[row[0]] = int(row[1])
+        return sizes_dict
 
     def get_names(self):
         return list(self.data_dict.keys())
@@ -48,46 +61,54 @@ class GenomeTagRange(object):
             if start < self.data_dict[chr]['end'][i]:
                 return 0
 
-            if i < len(self.data_dict[chr]['start'] - 1) and end >= self.data_dict[chr]['start'][i+1]:
+            if i < (len(self.data_dict[chr]['start']) - 1) and end >= self.data_dict[chr]['start'][i+1]:
                 return 0
 
-            if i == len(self.data_dict[chr]['start'] - 1):
+            if i == (len(self.data_dict[chr]['start']) - 1):
                 return start - self.data_dict[chr]['end'][i]
             else:
                 return min(start - self.data_dict[chr]['end'][i], self.data_dict[chr]['start'][i+1] - end)
 
-
     def get_untagged_ranges(self, chr, distance=1000, range_len=None):
-        new_dict = {RANGE_START: [], RANGE_END: []}
+        new_dict = {RANGE_START: [], RANGE_END: [], RANGE_LEN: []}
 
-        for i in range(self.data_dict[chr][RANGE_START]):
+        for i in range(len(self.data_dict[chr][RANGE_START])):
             if range_len is None:
-                curr_len = self.data_dict[chr][RANGE_END] - self.data_dict[chr][RANGE_START]
+                curr_len = self.data_dict[chr][RANGE_END][i] - self.data_dict[chr][RANGE_START][i]
             else:
                 curr_len = range_len
-            curr_start = self.data_dict[chr][RANGE_START] - curr_len - distance
-            curr_end = curr_start + curr_len
-
-            if self.get_distance_from_tagged(chr, curr_start, curr_end) >= distance:
-                new_dict[RANGE_START].append(curr_start)
-                new_dict[RANGE_END].append = curr_start + curr_len
-
-
-            curr_start = self.data_dict[chr][RANGE_END] + distance
+            curr_start = self.data_dict[chr][RANGE_START][i] - curr_len - distance
             curr_end = curr_start + curr_len
             if self.get_distance_from_tagged(chr, curr_start, curr_end) >= distance:
                 new_dict[RANGE_START].append(curr_start)
-                new_dict[RANGE_END].append = curr_start + curr_len
+                new_dict[RANGE_END].append(curr_start + curr_len)
+                new_dict[RANGE_LEN].append(curr_len)
+
+            curr_start = self.data_dict[chr][RANGE_END][i] + distance
+            curr_end = curr_start + curr_len
+            if self.get_distance_from_tagged(chr, curr_start, curr_end) >= distance:
+                new_dict[RANGE_START].append(curr_start)
+                new_dict[RANGE_END].append(curr_start + curr_len)
+                new_dict[RANGE_LEN].append(curr_len)
 
         return new_dict
 
     def get_random_untagged_ranges(self, chr, ranges_num, range_len, distance=1000):
-        pass
-        # new_dict = {RANGE_START: [], RANGE_END: []}
-        # tries = 0
-        # max_tries = ranges_num * ranges_num
-        # while len(new_dict[RANGE_START]) < ranges_num and tries < max_tries:
-
+        new_dict = {RANGE_START: [], RANGE_END: [], RANGE_LEN: []}
+        tries = 0
+        max_tries = ranges_num * ranges_num
+        curr_size = self.sizes_dict[chr]
+        min_base = int(0.00001 * curr_size)
+        max_base = curr_size - range_len - 1
+        while len(new_dict[RANGE_START]) < ranges_num and tries < max_tries:
+            tries += 1
+            curr_start = np.random.randint(min_base, max_base)
+            curr_end = curr_start + range_len
+            if self.get_distance_from_tagged(chr, curr_start, curr_end) >= distance:
+                new_dict[RANGE_START].append(curr_start)
+                new_dict[RANGE_END].append(curr_end)
+                new_dict[RANGE_LEN].append(range_len)
+        return new_dict
 
     def get_tag_for_range(self, chr, start, length):
         if length <= 0:
@@ -135,6 +156,3 @@ class GenomeTagRange(object):
             extension_list = self.get_tag_for_range(chr, curr_end, length - (curr_end - start))
             curr_island_tag.extend(extension_list)
             return curr_island_tag
-
-def create_transition_matrix(chr_list):
-    # Create
