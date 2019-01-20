@@ -2,6 +2,11 @@ import csv
 import bisect
 
 
+RANGE_START = 'start'
+RANGE_END = 'end'
+RANGE_SCORE = 'score'
+
+
 def read_range(fd, start, length):
     fd.seek(start)
     ret = fd.read(length)
@@ -21,13 +26,68 @@ class GenomeTagRange(object):
 
             for row in tsv_reader:
                 if row[0] not in self.data_dict:
-                    self.data_dict[row[0]] = {'start': [], 'end': [], 'score': []}
-                self.data_dict[row[0]]['start'].append(int(row[1]))
-                self.data_dict[row[0]]['end'].append(int(row[2]))
-                self.data_dict[row[0]]['score'].append(int(row[3]))
+                    self.data_dict[row[0]] = {RANGE_START: [], RANGE_END: [], RANGE_SCORE: []}
+                self.data_dict[row[0]][RANGE_START].append(int(row[1]))
+                self.data_dict[row[0]][RANGE_END].append(int(row[2]))
+                self.data_dict[row[0]][RANGE_SCORE].append(int(row[3]))
 
     def get_names(self):
         return list(self.data_dict.keys())
+
+    def get_tagged_ranges(self, chr):
+        return self.data_dict[chr]
+
+    def get_distance_from_tagged(self, chr, start, end):
+        i = bisect.bisect_right(self.data_dict[chr]['start'], start) - 1
+        if i < 0:
+            if end < self.data_dict[chr]['start'][0]:
+                return self.data_dict[chr]['start'][0] - end
+            else:
+                return 0
+        else:
+            if start < self.data_dict[chr]['end'][i]:
+                return 0
+
+            if i < len(self.data_dict[chr]['start'] - 1) and end >= self.data_dict[chr]['start'][i+1]:
+                return 0
+
+            if i == len(self.data_dict[chr]['start'] - 1):
+                return start - self.data_dict[chr]['end'][i]
+            else:
+                return min(start - self.data_dict[chr]['end'][i], self.data_dict[chr]['start'][i+1] - end)
+
+
+    def get_untagged_ranges(self, chr, distance=1000, range_len=None):
+        new_dict = {RANGE_START: [], RANGE_END: []}
+
+        for i in range(self.data_dict[chr][RANGE_START]):
+            if range_len is None:
+                curr_len = self.data_dict[chr][RANGE_END] - self.data_dict[chr][RANGE_START]
+            else:
+                curr_len = range_len
+            curr_start = self.data_dict[chr][RANGE_START] - curr_len - distance
+            curr_end = curr_start + curr_len
+
+            if self.get_distance_from_tagged(chr, curr_start, curr_end) >= distance:
+                new_dict[RANGE_START].append(curr_start)
+                new_dict[RANGE_END].append = curr_start + curr_len
+
+
+            curr_start = self.data_dict[chr][RANGE_END] + distance
+            curr_end = curr_start + curr_len
+            if self.get_distance_from_tagged(chr, curr_start, curr_end) >= distance:
+                new_dict[RANGE_START].append(curr_start)
+                new_dict[RANGE_END].append = curr_start + curr_len
+
+        return new_dict
+
+    def get_random_untagged_ranges(self, chr, ranges_num, range_len, distance=1000):
+        pass
+        # new_dict = {RANGE_START: [], RANGE_END: []}
+        # tries = 0
+        # max_tries = ranges_num * ranges_num
+        # while len(new_dict[RANGE_START]) < ranges_num and tries < max_tries:
+
 
     def get_tag_for_range(self, chr, start, length):
         if length <= 0:
@@ -75,3 +135,6 @@ class GenomeTagRange(object):
             extension_list = self.get_tag_for_range(chr, curr_end, length - (curr_end - start))
             curr_island_tag.extend(extension_list)
             return curr_island_tag
+
+def create_transition_matrix(chr_list):
+    # Create

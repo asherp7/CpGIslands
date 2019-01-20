@@ -1,0 +1,54 @@
+Data/**
+Code/python/__pycache__/**
+Code/python/logs/**
+
+#Ignore thumbnails created by Windows
+Thumbs.db
+
+# Ignore file types
+*.pyc
+
+# Ignore folders created by pycharm IDE
+.idea/
+.idea/*
+__pycache__/
+__pycache__/*
+
+#Ignore files built by Visual Studio
+*.obj
+*.exe
+*.pdb
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+[Bb]in
+[Dd]ebug*/
+*.lib
+*.sbr
+obj/
+[Rr]elease*/
+_ReSharper*/
+[Tt]est[Rr]esult*
+.vs/
+#Nuget packages folder
+packages/
+/Docs/**
+*.asv
+
+# Ignore profiling files
+*.pstat
+
+# Ignore pyinstaller files
+dist/
+build/
