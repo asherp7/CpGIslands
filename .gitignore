@@ -52,3 +52,6 @@ packages/
 # Ignore pyinstaller files
 dist/
 build/
+
+# Ignore data folder
+data/
