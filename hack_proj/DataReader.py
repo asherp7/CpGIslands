@@ -1,6 +1,4 @@
 import pandas as pd
-import itertools
-from collections import Counter
 from Bio import SeqIO
 import os
 
@@ -33,25 +31,6 @@ class DataReader:
 
     def _add_cpg_island_lengths(self):
         self.cgi_bed['LENGTH'] = self.cgi_bed['END'] - self.cgi_bed['START']
-
-    def get_k_mer_histogram(self, seq, k, printNonZero=False):
-        counter = Counter()
-        bases = ['a', 'c', 'g', 't']
-        counter.update([seq[i:i + k] for i in range(len(seq) - k + 1)])
-
-        # if printNonZero is True, output all kmers and thier frequency in seq:
-        if printNonZero:
-            for j in sorted(counter.keys()):
-                print('{}\t{}'.format(j, counter[j]))
-
-        kmer_and_values = [(''.join(p), 0) for p in itertools.product(bases, repeat=k)]
-        histogram = []
-        for (kmer, value) in kmer_and_values:
-            if kmer in counter:
-                histogram.append(counter[kmer])
-            else:
-                histogram.append(value)
-        return histogram
 
     def get_sequence(self, chromosome, start_index, n):
         with open(self.split_data + chromosome, 'rt') as data_file:
