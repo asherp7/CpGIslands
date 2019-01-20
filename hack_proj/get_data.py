@@ -57,4 +57,3 @@ if __name__ == '__main__':
     chrom = get_chrom(sys.argv[1])
     seqs_list, labels_list = set_data(chrom, loc_cpg_island, loc_not_cpg_island)
 
-    
