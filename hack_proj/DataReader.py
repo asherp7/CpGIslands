@@ -98,5 +98,3 @@ class DataReader:
                 print(record.id)
 
 
-
-
