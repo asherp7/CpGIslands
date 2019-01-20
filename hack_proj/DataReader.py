@@ -21,7 +21,8 @@ class DataReader:
         self.open_data_file_object()
 
     def __del__(self):
-        self.data_file_object.close()
+        if self.data_file_object:
+            self.data_file_object.close()
 
     def open_data_file_object(self):
         self.data_file_object = open(self.hg19fa_path)
