@@ -22,16 +22,24 @@ def svm_testing_loss(clf, test_data, test_labels):
             fp += 1
         elif predction == 0 and label == 1:
             fn += 1
+    recall = tp / (tp + fn)
+    precision = tp / (tp + fp)
     num_predections = len(predictions)
-    print('predictions = ', predictions[:-100])
-    print('test_labels = ', test_labels[:-100])
-    print('np.shape = ', np.array(test_labels).shape)
-    print('RECALL = ', tp / (tp + fn))
-    print('PRECISION = ', tp / (tp + fp))
-    print('TP = ', tp)
-    print('TN = ', tn)
-    print('FP = ', fp)
-    print('FN = ', fn)
+
+    # print svm results:
+    print('***********************')
+    print('*                     *')
+    print('*     SVM RESULTS:    *')
+    print('*                     *')
+    print('* RECALL = ', recall)
+    print('* PRECISION = ', precision)
+    print('* TP = ', tp)
+    print('* TN = ', tn)
+    print('* FP = ', fp)
+    print('* FN = ', fn)
+    print('*')
+    print('************************')
+    return tp, tn, fp, fn, recall, precision, num_predections
 
 
 def get_k_mer_histogram(seq, k, printNonZero=False):
@@ -55,22 +63,33 @@ def get_k_mer_histogram(seq, k, printNonZero=False):
     return histogram
 
 
-with open('data/all_data', 'rb') as myf:
-    data = pickle.load(myf)
+def train_svm(data_path, k):
+    with open(data_path, 'rb') as myf:
+        data = pickle.load(myf)
+    # Converting sequence data to histograms of k-mers
+    print('Converting sequence data to histograms of k-mers...')
+    X = []
+    Y = []
+    for (seq, data_label, _) in data:
+        X.append(get_k_mer_histogram(seq, k))
+        Y.append(data_label)
 
-# Converting sequence data to histograms of k-mers
-print('Converting sequence data to histograms of k-mers...')
-X = []
-Y = []
-for (seq, data_label, _) in data:
-    X.append(get_k_mer_histogram(seq, K_MER_LEN))
-    Y.append(data_label)
+    size_of_test_set = int(len(Y) * TESTING_RATIO)
 
-size_of_test_set = int(len(Y) * TESTING_RATIO)
+    clf = svm.SVC(gamma='scale')
+    # print(' Started SVM Training...')
+    clf.fit(X[:-size_of_test_set], Y[:-size_of_test_set])
+    results = svm_testing_loss(clf, X[-size_of_test_set:], Y[-size_of_test_set:])
+    return results
 
-clf = svm.SVC(gamma='scale')
-# print(' Started SVM Training...')
-clf.fit(X[:-size_of_test_set], Y[:-size_of_test_set])
-testing_loss = 0
 
-svm_testing_loss(clf, X[-size_of_test_set:], Y[-size_of_test_set:])
+def compare_svm_on_k_list(data_path, k_list=range(1,7)):
+    results = []
+    for k in k_list:
+        results.append(train_svm(data_path, k))
+    return results
+
+
+if __name__ == '__main__':
+    # train_svm('data/all_data', K_MER_LEN)
+    print(compare_svm_on_k_list('data/all_data'))
