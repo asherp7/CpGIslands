@@ -2,6 +2,7 @@ import pandas as pd
 import itertools
 from collections import Counter
 from Bio import SeqIO
+import os
 
 
 class DataReader:
@@ -33,14 +34,15 @@ class DataReader:
     def _add_cpg_island_lengths(self):
         self.cgi_bed['LENGTH'] = self.cgi_bed['END'] - self.cgi_bed['START']
 
-    def get_k_mer_histogram(self, seq, k):
+    def get_k_mer_histogram(self, seq, k, printNonZero=False):
         counter = Counter()
         bases = ['a', 'c', 'g', 't']
         counter.update([seq[i:i + k] for i in range(len(seq) - k + 1)])
 
-        # uncomment to output all kmers and thier frequency in seq:
-        # for j in sorted(counter.keys()):
-        #     print('{}\t{}'.format(j, counter[j]))
+        # if printNonZero is True, output all kmers and thier frequency in seq:
+        if printNonZero:
+            for j in sorted(counter.keys()):
+                print('{}\t{}'.format(j, counter[j]))
 
         kmer_and_values = [(''.join(p), 0) for p in itertools.product(bases, repeat=k)]
         histogram = []
@@ -83,10 +85,12 @@ class DataReader:
 
     def devideDataToChromosomes(self):
         """
-        split large data_file into one file for chromosome
+        split large data_file into one file per chromosome
         :param new_file_path: path to write the splitted data
         :return:
         """
+        if not os.path.exists(self.split_data):
+            os.mkdir(self.split_data)
         with open(self.hg19fa_path, 'rt') as fd:
             for record in SeqIO.parse(fd, 'fasta'):
                 with open(self.split_data + record.id, 'wt') as new_fd:

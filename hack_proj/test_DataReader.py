@@ -15,7 +15,7 @@ print('hg19 size (93 x AVG_CHROME_SIZE): ', len(data_reader.chromosome_list) * i
 print('chromosome list:', data_reader.chromosome_list)
 sequence = data_reader.get_sequence('chr1', 10000, 100)
 print('get sequence example: ', sequence)
-print('histogram of sequence:', data_reader.get_k_mer_histogram(sequence, 5))
+print('histogram of sequence:', data_reader.get_k_mer_histogram(sequence, 5, True))
 
 
 
