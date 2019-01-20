@@ -1,6 +1,8 @@
 import csv
 import bisect
 import numpy as np
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
 
 
 RANGE_START = 'start'
@@ -156,3 +158,28 @@ class GenomeTagRange(object):
             extension_list = self.get_tag_for_range(chr, curr_end, length - (curr_end - start))
             curr_island_tag.extend(extension_list)
             return curr_island_tag
+
+
+def show_roc_curve(y, y_score, title='ROC Curve'):
+    fpr, tpr, thresholds = roc_curve(y, y_score)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr, tpr, c=thresholds, color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+
+    # create the axis of thresholds (scores)
+    ax2 = plt.gca().twinx()
+    ax2.plot(fpr, thresholds, markeredgecolor='r', linestyle='dashed', color='g')
+    ax2.set_ylabel('Threshold', color='g')
+    ax2.set_ylim([thresholds[-1], thresholds[0]])
+    ax2.set_xlim([fpr[0], fpr[-1]])
+    plt.show()
