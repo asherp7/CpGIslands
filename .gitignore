@@ -55,6 +55,3 @@ build/
 
 # Ignore data folder
 data/
-
-# Ignore test files
-hack_proj/lior_test.py

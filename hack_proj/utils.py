@@ -265,13 +265,13 @@ def create_island_overlap_data(chr_list, data_extractor: DataExtractor, pad_size
     all_seq = []
     all_labels = []
     for i, chr in enumerate(chr_list):
-        curr_all_seq, curr_all_labels = data_extractor.get_base_tagged_seq(chr, seq_num_list[i], pad_size, with_unknown=False)
+        curr_all_seq, curr_all_labels = data_extractor.get_base_tagged_seq(chr, seq_num_list[i], pad_size, with_unknown=True)
         all_seq.extend(curr_all_seq)
         all_labels.extend(curr_all_labels)
     return all_seq, all_labels
 
 
-def create_non_island_random_data(chr_list, data_extractor: DataExtractor, seq_num_list=None, seq_len=2001):
+def create_non_island_random_data(chr_list, data_extractor: DataExtractor, seq_num_list=None, seq_len=2001, min_distance=1000):
     if seq_num_list is None:
         seq_num_list = 1
     if isinstance(seq_num_list, int):
@@ -281,8 +281,8 @@ def create_non_island_random_data(chr_list, data_extractor: DataExtractor, seq_n
     all_labels = []
     for i, chr in enumerate(chr_list):
         curr_all_seq, curr_all_labels = data_extractor.get_non_island_random_data(chr, seq_num_list[i],
-                                                                                  seq_len=seq_len, min_distance=1000,
-                                                                                  with_unknown=False)
+                                                                                  seq_len=seq_len, min_distance=min_distance,
+                                                                                  with_unknown=True)
         all_seq.extend(curr_all_seq)
         all_labels.extend(curr_all_labels)
     return all_seq, all_labels
@@ -299,7 +299,7 @@ def create_near_island_data(chr_list, data_extractor: DataExtractor, seq_num_lis
     for i, chr in enumerate(chr_list):
         curr_all_seq, curr_all_labels = data_extractor.get_near_island_data(chr, seq_num_list[i], seq_len,
                                                                             distance=distance,
-                                                                            with_unknown=False)
+                                                                            with_unknown=True)
         all_seq.extend(curr_all_seq)
         all_labels.extend(curr_all_labels)
     return all_seq, all_labels
@@ -307,7 +307,7 @@ def create_near_island_data(chr_list, data_extractor: DataExtractor, seq_num_lis
 
 # Results stats
 def show_roc_curve(y, y_score, title='ROC Curve', show_grid=True, print_data=True):
-    fpr, tpr, thresholds = roc_curve(y, y_score)
+    fpr, tpr, thresholds = roc_curve(y, y_score, drop_intermediate=False)
     roc_auc = auc(fpr, tpr)
 
     plt.figure()
@@ -500,8 +500,15 @@ class CGFreqClassifier(IslandClassifier):
         y_pred[y_prob >= self.threshold] = 1
         return y_pred
 
+class MarkovLLRClassifier(IslandClassifier):
+    pass
 
 # General utils
+def normalize_arr(arr):
+    arr = arr - np.mean(arr)
+    arr = arr / np.std(arr)
+    return arr
+
 def count_substr(s, sub_str):
     count = 0
     start = 0
