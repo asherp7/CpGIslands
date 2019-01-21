@@ -5,6 +5,9 @@ from sklearn.metrics import roc_curve, auc, classification_report
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 import collections
+import pandas as pd
+import shutil
+import os
 
 import DataReader
 
@@ -186,6 +189,7 @@ class DataExtractor(object):
 
             curr_labels = self.genome_tag_reader.get_tag_for_range(chr, curr_start, curr_end - curr_start)
             curr_seq = self.data_reader.get_sequence('hg19.fa.' + chr, curr_start, curr_end - curr_start)
+            curr_seq = curr_seq.upper()
 
             if with_unknown or curr_seq.find(UNKNOWN_BASE) < 0:
                 all_seq.append(curr_seq)
@@ -508,7 +512,8 @@ def count_substr(s, sub_str):
         else:
             return count
 
-def list2arr(x):
+
+def obj2arr(x):
     if isinstance(x, list):
         return np.array(x)
     return x
@@ -519,10 +524,44 @@ def movsum(x, win_size):
     ret[win_size:] = ret[win_size:] - ret[:-win_size]
     return ret[win_size - 1:]
 
+def movavg(x, win_size):
+    f = np.ones(win_size, dtype=float) / win_size
+    ret = np.convolve(x, f, mode='same')
+    return ret
 
 def apply_window(arr, labels, win_size):
-    arr = list2arr(arr)
-    labels = list2arr(labels)
+    arr = obj2arr(arr)
+    labels = obj2arr(labels)
     win_arr = movsum(arr, win_size)
     win_labels = labels[int(win_size / 2):-int(win_size / 2)]
     return win_arr, win_labels
+
+
+# Genome browser utils
+def create_dict_from_array(scores, chr, first_pos, score_window_size, avg_window_size):
+    ret = []
+    window_scores = movavg(movsum(scores, score_window_size), avg_window_size)
+    side_size = int(avg_window_size / 2)
+    first_pos += side_size
+    for i in range(0, window_scores.size, avg_window_size):
+        ret.append({'chr': chr, 'start': first_pos + i - side_size, 'end': first_pos + i + side_size + 1, 'score': window_scores[i]})
+    return ret
+
+
+def create_bed_from_dict_list(dict_list, output_file_path, cols=['chr', 'start', 'end', 'score'], title=r'track name=CPGIslandsScores description="CPG islands scores" useScore=1'):
+    df = pd.DataFrame(dict_list, index=None)
+    if cols is not None:
+        df = df[cols]
+    tmp_path = output_file_path + '.tmp'
+    df.to_csv(tmp_path, sep='\t', index=False)
+
+    if not title.endswith('\n'):
+        title = title + '\n'
+
+    with open(tmp_path) as tmp_file:
+        line = tmp_file.readline()
+        with open(output_file_path, 'w') as output_file:
+            output_file.write('')
+            shutil.copyfileobj(tmp_file, output_file)
+    os.remove(tmp_path)
+
