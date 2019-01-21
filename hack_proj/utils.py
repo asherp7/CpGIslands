@@ -16,6 +16,10 @@ RANGE_SCORE = 'score'
 ALL_BASES = ['A', 'C', 'G', 'T']
 UNKNOWN_BASE = 'N'
 
+test_chrs = ['chr1']
+train_chrs = ['chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12',
+              'chr13', 'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr20', 'chr19', 'chr22', 'chr21']
+
 
 def read_range(fd, start, length):
     fd.seek(start)
@@ -165,7 +169,7 @@ class GenomeTagRange(object):
             curr_island_tag.extend(extension_list)
             return curr_island_tag
 
-
+# Data handling
 class DataExtractor(object):
     def __init__(self, data_reader, genome_tag_reader):
         self.data_reader = data_reader  # type: DataReader.DataReader
@@ -209,6 +213,7 @@ class DataExtractor(object):
         all_ranges[RANGE_END] = all_ranges[RANGE_END][:seq_num]
         return self.get_data_from_ranges(chr, all_ranges, 0, with_unknown)
 
+
 def get_results_from_dict_list(dict_list, label_key='label', pred_key='score'):
     y = []
     y_pred = []
@@ -218,6 +223,84 @@ def get_results_from_dict_list(dict_list, label_key='label', pred_key='score'):
     return y, y_pred
 
 
+def get_seq_windows(seq, window_size, base_labels=None):
+    all_seq = []
+    all_labels = []
+    side = int(window_size / 2)
+    for i in range(side, len(seq) - side):
+        all_seq.append(seq[i-side:i+side])
+        if base_labels is not None:
+            all_labels.append(base_labels[i-side:i+side])
+    new_seq = seq[side:len(seq) - side]
+    if base_labels is None:
+        return new_seq, all_seq
+    else:
+        new_lables = base_labels[side:len(seq) - side]
+        return new_seq, all_seq, new_lables, all_labels
+
+
+def get_random_sample(all_seq, all_labels=None, ratio=0.01, sample_size=None):
+    if sample_size is None:
+        sample_size = max(int(len(all_seq) * ratio), 1)
+    idx = np.random.choice(len(all_seq), sample_size, replace=False)
+    new_seq = [all_seq[j] for j in idx]
+    if all_labels is None:
+        return all_seq
+    else:
+        new_labels = [all_labels[j] for j in idx]
+        return all_seq, all_labels
+
+
+def create_island_overlap_data(chr_list, data_extractor: DataExtractor, pad_size=1000, seq_num_list=None):
+    if seq_num_list is None:
+        seq_num_list = [np.inf] * len(chr_list)
+    if isinstance(seq_num_list, int):
+        seq_num_list = [seq_num_list] * len(chr_list)
+
+    all_seq = []
+    all_labels = []
+    for i, chr in enumerate(chr_list):
+        curr_all_seq, curr_all_labels = data_extractor.get_base_tagged_seq(chr, seq_num_list[i], pad_size, with_unknown=False)
+        all_seq.extend(curr_all_seq)
+        all_labels.extend(curr_all_labels)
+    return all_seq, all_labels
+
+
+def create_non_island_random_data(chr_list, data_extractor: DataExtractor, seq_num_list=None, seq_len=2001):
+    if seq_num_list is None:
+        seq_num_list = 1
+    if isinstance(seq_num_list, int):
+        seq_num_list = [seq_num_list] * len(chr_list)
+
+    all_seq = []
+    all_labels = []
+    for i, chr in enumerate(chr_list):
+        curr_all_seq, curr_all_labels = data_extractor.get_non_island_random_data(chr, seq_num_list[i],
+                                                                                  seq_len=seq_len, min_distance=1000,
+                                                                                  with_unknown=False)
+        all_seq.extend(curr_all_seq)
+        all_labels.extend(curr_all_labels)
+    return all_seq, all_labels
+
+
+def create_near_island_data(chr_list, data_extractor: DataExtractor, seq_num_list=None, distance=1000, seq_len=2001):
+    if seq_num_list is None:
+        seq_num_list = [np.inf] * len(chr_list)
+    if isinstance(seq_num_list, int):
+        seq_num_list = [seq_num_list] * len(chr_list)
+
+    all_seq = []
+    all_labels = []
+    for i, chr in enumerate(chr_list):
+        curr_all_seq, curr_all_labels = data_extractor.get_near_island_data(chr, seq_num_list[i], seq_len,
+                                                                            distance=distance,
+                                                                            with_unknown=False)
+        all_seq.extend(curr_all_seq)
+        all_labels.extend(curr_all_labels)
+    return all_seq, all_labels
+
+
+# Results stats
 def show_roc_curve(y, y_score, title='ROC Curve', show_grid=True, print_data=True):
     fpr, tpr, thresholds = roc_curve(y, y_score)
     roc_auc = auc(fpr, tpr)
@@ -255,45 +338,8 @@ def print_prediction_stats(y, y_pred, target_names=('Regular', 'CPG')):
     print(get_prediction_stats(y, y_pred, target_names))
 
 
-def get_seq_windows(seq, window_size, base_labels=None):
-    all_seq = []
-    all_labels = []
-    side = int(window_size / 2)
-    for i in range(side, len(seq) - side):
-        all_seq.append(seq[i-side:i+side])
-        if base_labels is not None:
-            all_labels.append(base_labels[i-side:i+side])
-    new_seq = seq[side:len(seq) - side]
-    if base_labels is None:
-        return new_seq, all_seq
-    else:
-        new_lables = base_labels[side:len(seq) - side]
-        return new_seq, all_seq, new_lables, all_labels
 
-
-def get_random_sample(all_seq, all_labels=None, ratio=0.01, sample_size=None):
-    if sample_size is None:
-        sample_size = max(int(len(all_seq) * ratio), 1)
-    idx = np.random.choice(len(all_seq), sample_size, replace=False)
-    new_seq = [all_seq[j] for j in idx]
-    if all_labels is None:
-        return all_seq
-    else:
-        new_labels = [all_labels[j] for j in idx]
-        return all_seq, all_labels
-
-
-def count_substr(s, sub_str):
-    count = 0
-    start = 0
-    while True:
-        start = s.find(sub_str, start) + 1
-        if start > 0:
-            count += 1
-        else:
-            return count
-
-
+# Classifer classes
 class IslandClassifier(object):
     def __init__(self, threshold):
         self.threshold = threshold
@@ -449,3 +495,25 @@ class CGFreqClassifier(IslandClassifier):
         y_pred = np.zeros_like(y_prob)
         y_pred[y_prob >= self.threshold] = 1
         return y_pred
+
+
+# General utils
+def count_substr(s, sub_str):
+    count = 0
+    start = 0
+    while True:
+        start = s.find(sub_str, start) + 1
+        if start > 0:
+            count += 1
+        else:
+            return count
+
+
+def movsum(x, win_size):
+    side = int(win_size / 2)
+    ret = np.cumsum(x, dtype=float)
+    ret[win_size - side:] = ret[win_size - side:] - ret[:-win_size + side]
+    return ret[win_size:]
+
+def apply_window(arr, labels, win_size):
+    pass
