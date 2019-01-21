@@ -17,12 +17,12 @@ class MarkovModel(object):
         self.valid_states = valid_states
         self.valid_states_dict = list2dict(self.valid_states)
         self.states_num = len(self.valid_states)
-        self.count_states = self._create_order_states(self.order + 1)
-        self.count_states_dict = list2dict(self.count_states)
-        self.base_states = self._create_order_states(self.order)
+        self.full_states = self._create_combined_states(self.order + 1)
+        self.full_states_dict = list2dict(self.full_states)
+        self.base_states = self._create_combined_states(self.order)
         self.base_states_dict = list2dict(self.base_states)
 
-        self.log_prob_mat = np.log(np.ones(len(self.count_states), dtype=float) / len(self.count_states))
+        self.log_prob_mat = np.log(np.ones(len(self.full_states), dtype=float) / len(self.full_states))
         self.log_transition_mat = np.log(np.ones((pow(self.states_num, self.order), self.states_num), dtype=float) / self.states_num)
 
     def get_prob_mat(self):
@@ -31,12 +31,12 @@ class MarkovModel(object):
     def get_transition_mat(self):
         return np.exp(self.log_transition_mat)
 
-    def _create_order_states(self, len):
+    def _create_combined_states(self, len):
         return list([''.join(p) for p in itertools.product(self.valid_states, repeat=len)])
 
-    def _count_order_states(self, x, smooth=1):
+    def _count_full_states(self, x, smooth=1):
         count_dict = {}
-        for k in self.count_states:
+        for k in self.full_states:
             count_dict[k] = smooth
 
         for val in x:
@@ -48,11 +48,11 @@ class MarkovModel(object):
         return count_dict
 
     def fit_transition(self, x):
-        prob_mat = np.ones(len(self.count_states), dtype=float) / len(self.count_states)
+        prob_mat = np.ones(len(self.full_states), dtype=float) / len(self.full_states)
         transition_mat = np.ones((pow(self.states_num, self.order), self.states_num), dtype=float) / self.states_num
 
-        # Count all count states
-        count_dict = self._count_order_states(x)
+        # Count all full states
+        count_dict = self._count_full_states(x)
 
         # Count base states to normalize by
         norm_dict = {}
@@ -62,7 +62,7 @@ class MarkovModel(object):
             norm_dict[k[:-1]] += v
 
         # Create probability mat for the count states
-        for i, k in enumerate(self.count_states):
+        for i, k in enumerate(self.full_states):
             prob_mat[i] = count_dict[k] / norm_dict[k[:-1]]
 
         # Create transition mat from base states
@@ -79,7 +79,7 @@ class MarkovModel(object):
             curr_ret = []
             for i in range(len(val) - self.order):
                 try:
-                    curr_ret.append(self.count_states_dict[val[i:i + self.order + 1]])
+                    curr_ret.append(self.full_states_dict[val[i:i + self.order + 1]])
                 except:
                     curr_ret.append(MarkovModel.UNKNOWN_VAL)
             ret.append(np.array(curr_ret))
@@ -90,7 +90,7 @@ class MarkovModel(object):
         all_ll = []
         for arr in x_states:
             curr_ll = np.full_like(arr, fill_value=np.nan, dtype=float)
-            for i in range(len(self.count_states)):
+            for i in range(len(self.full_states)):
                 curr_ll[arr == i] = self.log_prob_mat[i]
             self.nan_to_prev(curr_ll, np.mean(self.log_prob_mat))
 
@@ -114,7 +114,7 @@ class MarkovModel(object):
 
 def print_prob_mat(markov_model: MarkovModel):
     prob_mat = markov_model.get_prob_mat()
-    for i, k in enumerate(markov_model.count_states):
+    for i, k in enumerate(markov_model.full_states):
         print('%s: %f' % (k, prob_mat[i]))
 
 

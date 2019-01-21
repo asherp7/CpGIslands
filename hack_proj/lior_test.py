@@ -50,8 +50,8 @@ def create_data_01(train_list, test_list):
 
 
 def test_new_markov():
-    markov_order = 2
-    win_size = 51
+    markov_order = 3
+    win_size = 201
     island_markov_path = r'C:\liorz\school\76558 Algorithms in Computational Biology\hackathon\data\tmp\create_data_01\markov_model_island_%d.pkl' % markov_order
     other_markov_path = r'C:\liorz\school\76558 Algorithms in Computational Biology\hackathon\data\tmp\create_data_01\markov_model_other_%d.pkl' % markov_order
     test_seq_pkl_path = r'C:\liorz\school\76558 Algorithms in Computational Biology\hackathon\data\tmp\create_data_01\chr1_125124_145563.pkl'
@@ -61,15 +61,13 @@ def test_new_markov():
     llr_markov = pickle.load(open(island_markov_path, 'rb')) # type: MarkovModel
     other_markov = pickle.load(open(other_markov_path, 'rb')) # type: MarkovModel
     seq, labels = pickle.load(open(test_seq_pkl_path, 'rb'))
-    seq = seq[:100000]
-    labels = labels[:100000]
+    seq = seq[:300000]
+    labels = labels[:300000]
     llr_markov.log_prob_mat = island_markov.log_prob_mat - other_markov.log_prob_mat
     llr_markov.log_transition_mat = island_markov.log_transition_mat - other_markov.log_transition_mat
-    print_transition_mat(island_markov)
+    # print_transition_mat(island_markov)
 
     llr_score = llr_markov.get_ll([seq])
-    llr_score_island = island_markov.get_ll([seq])
-    llr_score_other = other_markov.get_ll([seq])
 
     print('N Count: %d' % count_substr(seq, 'N'))
     new_labels = labels[llr_markov.order:]
@@ -77,16 +75,18 @@ def test_new_markov():
 
     show_roc_curve(window_labels, window_score, print_data=False)
     y_pred = np.zeros_like(window_score)
-    y_pred[window_score > 17.3] = 1
+    y_pred[window_score > 30] = 1
     print_prediction_stats(window_labels, y_pred)
     idx = np.array(range(window_score.size))
 
     plt.figure()
     plot_scores_and_labels(window_score, window_labels, 'LLR', 'Log Likeklihood Ratio - Markov order = %d, Win size = %d' % (markov_order, win_size))
     # plt.figure()
+    # llr_score_other = other_markov.get_ll([seq])
     # window_score_other, window_labels_other = apply_window(llr_score_other, new_labels, win_size=win_size)
     # plot_scores_and_labels(window_score_other, window_labels, 'Other LL', 'Other Sequence Log Likelihood - Markov order %d, Win size = %d' % (markov_order, win_size))
     # plt.figure()
+    # llr_score_island = island_markov.get_ll([seq])
     # window_score_island, window_labels_island = apply_window(llr_score_island, new_labels, win_size=win_size)
     # plot_scores_and_labels(window_score_island, window_labels, 'Island LL', 'Island Sequence Log Likelihood - Markov order %d, Win size = %d' % (markov_order, win_size))
     plt.show()
@@ -110,7 +110,7 @@ def train_markov_models():
                    r'C:\liorz\school\76558 Algorithms in Computational Biology\hackathon\data\tmp\create_data_01\train_near.pkl']
     output_dir = r'C:\liorz\school\76558 Algorithms in Computational Biology\hackathon\data\tmp\create_data_01'
 
-    markov_order = 5
+    markov_order = 6
     print('----------------Island data--------------')
     island_data = []
     for p in island_paths:
