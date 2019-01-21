@@ -10,7 +10,7 @@ K_MER_LEN = 6
 TESTING_RATIO = 0.1
 
 
-def svm_testing_loss(clf, test_data, test_labels):
+def svm_testing_loss(clf, test_data, test_labels, k):
     predictions = clf.predict(test_data)
     fn, fp, tn, tp = 0, 0, 0, 0
     for predction, label in zip(predictions, test_labels):
@@ -31,6 +31,7 @@ def svm_testing_loss(clf, test_data, test_labels):
     print('*                     *')
     print('*     SVM RESULTS:    *')
     print('*                     *')
+    print('* K-mer length = ', k)
     print('* RECALL = ', recall)
     print('* PRECISION = ', precision)
     print('* TP = ', tp)
@@ -79,7 +80,7 @@ def train_svm(data_path, k):
     clf = svm.SVC(gamma='scale')
     # print(' Started SVM Training...')
     clf.fit(X[:-size_of_test_set], Y[:-size_of_test_set])
-    results = svm_testing_loss(clf, X[-size_of_test_set:], Y[-size_of_test_set:])
+    results = svm_testing_loss(clf, X[-size_of_test_set:], Y[-size_of_test_set:], k)
     return results
 
 
