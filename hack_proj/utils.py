@@ -171,23 +171,43 @@ class DataExtractor(object):
         self.data_reader = data_reader  # type: DataReader.DataReader
         self.genome_tag_reader = genome_tag_reader  # type: GenomeTagRange
 
-    def get_base_tagged_seq(self, chr, seq_num=1, pad_size=1000, with_unknown=False):
+    def get_data_from_ranges(self, chr, ranges_dict, pad_size=0, with_unknown=False):
         all_seq = []
         all_labels = []
-        all_ranges = self.genome_tag_reader.get_tagged_ranges(chr)
-        for i in range(min(seq_num, len(all_ranges[RANGE_START]))):
-            curr_start = all_ranges[RANGE_START][i] - pad_size
-            curr_end = all_ranges[RANGE_END][i] + pad_size
+        seq_num = len(ranges_dict[RANGE_START])
+        for i in range(seq_num):
+            curr_start = ranges_dict[RANGE_START][i] - pad_size
+            curr_end = ranges_dict[RANGE_END][i] + pad_size
 
             curr_labels = self.genome_tag_reader.get_tag_for_range(chr, curr_start, curr_end - curr_start)
-            curr_seq = self.data_reader.get_sequence('hg19.fa.chr1', curr_start, curr_end - curr_start)
+            curr_seq = self.data_reader.get_sequence('hg19.fa.' + chr, curr_start, curr_end - curr_start)
 
-            if not curr_seq.find(UNKNOWN_BASE):
+            if with_unknown or curr_seq.find(UNKNOWN_BASE) < 0:
                 all_seq.append(curr_seq)
                 all_labels.append(curr_labels)
-
+            else:
+                print('%d-%s: Found %s in sequence at %d' % ((i+1), chr, UNKNOWN_BASE, curr_seq.find(UNKNOWN_BASE) + curr_start))
+        if len(all_seq) < seq_num:
+            print('Returned %d sequqnces instead of %d. Missed %d sequences.' % (len(all_seq), seq_num, seq_num - len(all_seq)))
         return all_seq, all_labels
 
+    def get_base_tagged_seq(self, chr, seq_num=1, pad_size=1000, with_unknown=False):
+        all_ranges = self.genome_tag_reader.get_tagged_ranges(chr)
+        seq_num = min(seq_num, len(all_ranges[RANGE_START]))
+        all_ranges[RANGE_START] = all_ranges[RANGE_START][:seq_num]
+        all_ranges[RANGE_END] = all_ranges[RANGE_END][:seq_num]
+        return self.get_data_from_ranges(chr, all_ranges, pad_size, with_unknown)
+
+    def get_non_island_random_data(self, chr, seq_num=1, seq_len=1000, min_distance=1000, with_unknown=False):
+        all_ranges = self.genome_tag_reader.get_random_untagged_ranges(chr, seq_num, seq_len, distance=min_distance)
+        return self.get_data_from_ranges(chr, all_ranges, 0, with_unknown)
+
+    def get_near_island_data(self, chr, seq_num=1, seq_len=1000, distance=1000, with_unknown=False):
+        all_ranges = self.genome_tag_reader.get_untagged_ranges(chr, distance, seq_len)
+        seq_num = min(seq_num, 2 * len(all_ranges[RANGE_START]))
+        all_ranges[RANGE_START] = all_ranges[RANGE_START][:seq_num]
+        all_ranges[RANGE_END] = all_ranges[RANGE_END][:seq_num]
+        return self.get_data_from_ranges(chr, all_ranges, 0, with_unknown)
 
 def get_results_from_dict_list(dict_list, label_key='label', pred_key='score'):
     y = []
@@ -198,13 +218,13 @@ def get_results_from_dict_list(dict_list, label_key='label', pred_key='score'):
     return y, y_pred
 
 
-def show_roc_curve(y, y_score, title='ROC Curve'):
+def show_roc_curve(y, y_score, title='ROC Curve', show_grid=True, print_data=True):
     fpr, tpr, thresholds = roc_curve(y, y_score)
     roc_auc = auc(fpr, tpr)
 
     plt.figure()
     lw = 2
-    plt.plot(fpr, tpr, c=thresholds, color='darkorange',
+    plt.plot(fpr, tpr, color='darkorange',
              lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
     plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
     plt.xlim([0.0, 1.0])
@@ -213,6 +233,7 @@ def show_roc_curve(y, y_score, title='ROC Curve'):
     plt.ylabel('True Positive Rate')
     plt.title(title)
     plt.legend(loc="lower right")
+    plt.grid(show_grid)
 
     # create the axis of thresholds (scores)
     ax2 = plt.gca().twinx()
@@ -220,6 +241,9 @@ def show_roc_curve(y, y_score, title='ROC Curve'):
     ax2.set_ylabel('Threshold', color='g')
     ax2.set_ylim([thresholds[-1], thresholds[0]])
     ax2.set_xlim([fpr[0], fpr[-1]])
+    if print_data:
+        for i in range(fpr.size):
+            print('FPR: %.3f, TPR: %.3f: Threshold = %.4f' % (fpr[i], tpr[i], thresholds[i]))
     plt.show()
 
 
@@ -247,6 +271,29 @@ def get_seq_windows(seq, window_size, base_labels=None):
         return new_seq, all_seq, new_lables, all_labels
 
 
+def get_random_sample(all_seq, all_labels=None, ratio=0.01, sample_size=None):
+    if sample_size is None:
+        sample_size = max(int(len(all_seq) * ratio), 1)
+    idx = np.random.choice(len(all_seq), sample_size, replace=False)
+    new_seq = [all_seq[j] for j in idx]
+    if all_labels is None:
+        return all_seq
+    else:
+        new_labels = [all_labels[j] for j in idx]
+        return all_seq, all_labels
+
+
+def count_substr(s, sub_str):
+    count = 0
+    start = 0
+    while True:
+        start = s.find(sub_str, start) + 1
+        if start > 0:
+            count += 1
+        else:
+            return count
+
+
 class IslandClassifier(object):
     def __init__(self, threshold):
         self.threshold = threshold
@@ -259,6 +306,80 @@ class IslandClassifier(object):
 
     def get_seq_classification(self, all_seq):
         pass
+
+
+class SubstrFreqClassifier(IslandClassifier):
+    def __init__(self, substr_list, seq_window_len, threshold=None):
+        IslandClassifier.__init__(self, threshold)
+        self.seq_window_len = seq_window_len
+        self.svc_clf = None  # type: SVC
+        self.substr_list = substr_list
+
+    def set_threshold(self, threshold):
+        self.threshold = threshold
+
+    def get_seq_freqs(self, seq):
+        freqs = []
+
+        for i, s in enumerate(self.substr_list):
+            if len(s) == 1:
+                freqs.append(seq.count(s) / len(seq))
+            else:
+                freqs.append(count_substr(seq, s) / (len(seq) - len(s) + 1))
+
+        return freqs
+
+    def lst2arr(self, lst):
+        arr = np.array(lst)
+        if len(arr.shape) == 1:
+            arr = np.reshape(arr, (-1, 1))
+        return arr
+
+    def get_data_from_seq_list(self, all_seq):
+        x = []
+        for i in range(len(all_seq)):
+            seq = all_seq[i]
+            freqs = self.get_seq_freqs(seq)
+            x.append(freqs)
+
+        return x
+
+    def fit(self, all_seq, y, use_window=True, seq_ratio=0.01):
+        x = []
+        new_y = []
+        print('Create data to fit...')
+        for i in range(len(all_seq)):
+            seq = all_seq[i]
+            if not use_window:
+                freqs = self.get_seq_freqs(seq)
+                x.append(freqs)
+            else:
+                new_seq, all_windows_seq = get_seq_windows(seq, self.seq_window_len)
+                all_windows_seq = get_random_sample(all_windows_seq, all_labels=None, ratio=seq_ratio)
+                curr_x = self.get_data_from_seq_list(all_windows_seq)
+                x.extend(curr_x)
+                new_y.extend([y[i]] * len(curr_x))
+
+        if use_window:
+            y = new_y
+
+        x = self.lst2arr(x)
+        self.svc_clf = SVC(kernel='linear', probability=True, max_iter=10000)
+        print('Fit data (%d samples)...' % (x.shape[0]))
+        self.svc_clf.fit(x, np.array(y))
+
+    def get_seq_prob(self, all_seq):
+        x = self.get_data_from_seq_list(all_seq)
+        y_pred = self.svc_clf.predict_proba(self.lst2arr(x))
+        return y_pred[:, 1]
+
+    def classify_seq(self, seq, labels=None):
+        new_seq, all_seq, new_lables, all_labels = get_seq_windows(seq, window_size=self.seq_window_len,
+                                                                   base_labels=labels)
+        y_prob = self.get_seq_prob(all_seq)
+        y_pred = np.zeros_like(y_prob)
+        y_pred[y_prob >= self.threshold] = 1
+        return y_pred
 
 
 class CGFreqClassifier(IslandClassifier):
