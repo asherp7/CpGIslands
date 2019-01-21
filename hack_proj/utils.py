@@ -169,6 +169,7 @@ class GenomeTagRange(object):
             curr_island_tag.extend(extension_list)
             return curr_island_tag
 
+
 # Data handling
 class DataExtractor(object):
     def __init__(self, data_reader, genome_tag_reader):
@@ -245,10 +246,10 @@ def get_random_sample(all_seq, all_labels=None, ratio=0.01, sample_size=None):
     idx = np.random.choice(len(all_seq), sample_size, replace=False)
     new_seq = [all_seq[j] for j in idx]
     if all_labels is None:
-        return all_seq
+        return new_seq
     else:
         new_labels = [all_labels[j] for j in idx]
-        return all_seq, all_labels
+        return new_seq, new_labels
 
 
 def create_island_overlap_data(chr_list, data_extractor: DataExtractor, pad_size=1000, seq_num_list=None):
@@ -336,7 +337,6 @@ def get_prediction_stats(y, y_pred, target_names=('Regular', 'CPG')):
 
 def print_prediction_stats(y, y_pred, target_names=('Regular', 'CPG')):
     print(get_prediction_stats(y, y_pred, target_names))
-
 
 
 # Classifer classes
@@ -508,12 +508,21 @@ def count_substr(s, sub_str):
         else:
             return count
 
+def list2arr(x):
+    if isinstance(x, list):
+        return np.array(x)
+    return x
+
 
 def movsum(x, win_size):
-    side = int(win_size / 2)
     ret = np.cumsum(x, dtype=float)
-    ret[win_size - side:] = ret[win_size - side:] - ret[:-win_size + side]
-    return ret[win_size:]
+    ret[win_size:] = ret[win_size:] - ret[:-win_size]
+    return ret[win_size - 1:]
+
 
 def apply_window(arr, labels, win_size):
-    pass
+    arr = list2arr(arr)
+    labels = list2arr(labels)
+    win_arr = movsum(arr, win_size)
+    win_labels = labels[int(win_size / 2):-int(win_size / 2)]
+    return win_arr, win_labels
